@@ -7,3 +7,5 @@ faiss_index
 mlartifacts
 mlruns
 .python-version
+.DS_Store
+venv/

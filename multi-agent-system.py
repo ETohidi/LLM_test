@@ -7,8 +7,28 @@ from dotenv import load_dotenv
 import json
 import logging
 from dspy.evaluate import Evaluate
-from dspy.teleprompt import GEPA
-from dspy.teleprompt.gepa.gepa_utils import ScoreWithFeedback
+from dspy.teleprompt import MIPROv2
+
+# Define ScoreWithFeedback (since it's not available)
+class ScoreWithFeedback:
+    def __init__(self, score: float, feedback: str = ""):
+        self.score = score
+        self.feedback = feedback
+    
+    def __float__(self):
+        return float(self.score)
+    
+    def __add__(self, other):
+        """Allow addition for sum() operations"""
+        if isinstance(other, (int, float)):
+            return float(self.score) + other
+        return float(self.score) + float(other)
+    
+    def __radd__(self, other):
+        """Right-hand addition (for sum())"""
+        if other == 0:
+            return float(self.score)
+        return self.__add__(other)
 from pathlib import Path
 import random
 
@@ -475,7 +495,7 @@ def llm_metric_prediction(*args, **kwargs):
 
 # %%
 # Set up the evaluator
-evaluator_diabetes = Evaluate(devset=devset_diabetes, num_threads=32, display_progress=True, display_table=5, provide_traceback=True)
+evaluator_diabetes = Evaluate(devset=devset_diabetes, num_threads=1, display_progress=True, display_table=5, provide_traceback=True)
 
 # %%
 class ReActSignature(dspy.Signature):
@@ -528,14 +548,11 @@ dspy.enable_logging()
 diabetes_agent.agent.extract._compiled = True
 diabetes_agent.agent.react._compiled = False
 # Set up the teleprompter/optimizer using GEPA (per reference notebook)
-teleprompter = GEPA(
+teleprompter = MIPROv2(
     metric=llm_metric_prediction,
-    max_full_evals=2,
-    num_threads=32,
-    track_stats=True,
-    track_best_outputs=True,
-    add_format_failure_as_feedback=True,
-    reflection_lm=teacher_lm,
+    num_candidates=10,
+    init_temperature=1.0,
+    verbose=True
 )
 
 # %%
@@ -615,7 +632,7 @@ copd_agent = COPDAgent()
 
 
 # %%
-evaluator_copd = Evaluate(devset=devset_copd, num_threads=32, display_progress=True, display_table=5, provide_traceback=True)
+evaluator_copd = Evaluate(devset=devset_copd, num_threads=1, display_progress=True, display_table=5, provide_traceback=True)
 
 # Evaluate the baseline agent (the existing `react`)
 print("Evaluating the baseline ReAct agent...")
@@ -627,14 +644,11 @@ copd_baseline_eval
 # %%
 copd_agent.copd_agent.extract._compiled = True
 copd_agent.copd_agent.react._compiled = False
-teleprompter = GEPA(
+teleprompter = MIPROv2(
     metric=llm_metric_prediction,
-    max_full_evals=2,
-    num_threads=32,
-    track_stats=True,
-    track_best_outputs=True,
-    add_format_failure_as_feedback=True,
-    reflection_lm=teacher_lm,
+    num_candidates=10,
+    init_temperature=1.0,
+    verbose=True
 )
 
 optimized_copd_agent = teleprompter.compile(student=copd_agent, trainset=trainset_copd, valset=devset_copd)
@@ -739,7 +753,7 @@ print(f"Dev set size: {len(devset_joint)}")
 
 # %%
 # Baseline evaluation of the lead agent on the joint dev set
-evaluator_joint = Evaluate(devset=devset_joint, num_threads=32, display_progress=True, display_table=5, provide_traceback=True)
+evaluator_joint = Evaluate(devset=devset_joint, num_threads=1, display_progress=True, display_table=5, provide_traceback=True)
 print("Evaluating baseline Lead ReAct (agents-as-tools) on joint dev set...")
 baseline_lead_eval = evaluator_joint(lead_react, metric=llm_metric_prediction)
 
@@ -750,14 +764,11 @@ baseline_lead_eval
 lead_react.lead_react.extract._compiled = True
 lead_react.lead_react.react._compiled = False
 
-teleprompter_joint = GEPA(
+teleprompter = MIPROv2(
     metric=llm_metric_prediction,
-    max_full_evals=3,
-    num_threads=32,
-    track_stats=True,
-    track_best_outputs=True,
-    add_format_failure_as_feedback=True,
-    reflection_lm=teacher_lm,
+    num_candidates=10,
+    init_temperature=1.0,
+    verbose=True
 )
 
 
